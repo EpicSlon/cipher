@@ -1,0 +1,618 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Дешифратор шифров</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500;600&display=swap">
+<style>
+/* Раскладка: шапка с вкладками; во вкладке «Расшифровать» слева ввод и параметры, справа вердикт и варианты. */
+:root{
+  --bg:#edf1f3; --surface:#ffffff; --ink:#13222b; --muted:#566874; --line:#d2dadf;
+  --accent:#0b6e63; --accent-ink:#ffffff; --accent-soft:#dcf1ed;
+  --good:#17803d; --warn:#a85a07; --bad:#b4281f; --field:#f6f8f9;
+  --font-display:'Unbounded','IBM Plex Sans',system-ui,sans-serif;
+  --font-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'DejaVu Sans Mono','Segoe UI Symbol',monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1519; --surface:#142026; --ink:#e4ecef; --muted:#8ea0aa; --line:#25353d;
+  --accent:#3fc7b2; --accent-ink:#04201b; --accent-soft:#143a36;
+  --good:#4ccf7d; --warn:#e8a04a; --bad:#f0746c; --field:#0f1a1f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1519; --surface:#142026; --ink:#e4ecef; --muted:#8ea0aa; --line:#25353d;
+  --accent:#3fc7b2; --accent-ink:#04201b; --accent-soft:#143a36;
+  --good:#4ccf7d; --warn:#e8a04a; --bad:#f0746c; --field:#0f1a1f; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font-body);
+  padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+h1{font:600 clamp(1.4rem,4vw,2rem)/1.1 var(--font-display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0;max-width:60ch}
+nav{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
+nav{max-width:100%}nav button{flex:1;font:500 .9rem var(--font-body);color:var(--muted);background:none;border:0;border-radius:7px;padding:8px 12px;cursor:pointer}
+@media (max-width:560px){nav{width:100%}}
+nav button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:20px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel h2{font:600 .78rem var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+label{font-weight:500;font-size:.88rem;display:block;margin-bottom:5px}
+textarea,input[type=text],input[type=number],select{width:100%;font:400 1rem var(--font-mono);color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+textarea{min-height:130px;resize:vertical;line-height:1.55}
+select{font-family:var(--font-body)}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.hint{color:var(--muted);font-size:.82rem;margin:0}
+.btn{font:600 .92rem var(--font-body);background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:10px 16px;cursor:pointer}
+.btn.ghost{background:none;color:var(--accent);border:1px solid var(--line)}
+.btn.small{padding:6px 10px;font-size:.8rem}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:500 .8rem var(--font-body);background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.sym{font:500 1rem var(--font-mono);min-width:34px;padding:4px 6px;border-radius:6px;background:var(--field);border:1px solid var(--line);color:var(--ink);cursor:pointer}
+details{border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;font-weight:500;font-size:.88rem}
+.verdict{display:flex;flex-direction:column;gap:12px}
+.method{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tag{font:500 .78rem var(--font-body);background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:3px 9px}
+.answer{font:500 clamp(1.15rem,2.8vw,1.5rem)/1.45 var(--font-body);background:var(--accent-soft);border-radius:10px;padding:16px;overflow-wrap:anywhere;min-height:3em}
+.meter{display:flex;align-items:center;gap:10px;font-size:.85rem}
+.bar{flex:1;height:8px;background:var(--field);border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--good)}
+.bar i.mid{background:var(--warn)} .bar i.low{background:var(--bad)}
+.steps{margin:0;color:var(--muted);font-size:.88rem}
+.alts{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.alts button{width:100%;text-align:left;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:8px 11px;cursor:pointer;color:var(--ink);font:400 .85rem var(--font-body);display:flex;flex-direction:column;gap:2px}
+.alts button:hover{border-color:var(--accent)}
+.alts b{font-weight:600}.alts span{color:var(--muted);font-family:var(--font-mono);overflow-wrap:anywhere}
+.out{font:400 1.05rem/1.6 var(--font-mono);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:14px;overflow-wrap:anywhere;min-height:3.4em;white-space:pre-wrap}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;font:400 .85rem var(--font-mono);font-variant-numeric:tabular-nums}
+th,td{border:1px solid var(--line);padding:4px 8px;text-align:center;min-width:2em}
+th{background:var(--field);font-weight:500}
+.vt td,.vt th{padding:2px 5px;min-width:1.8em;font-size:.78rem}
+.vt td.hl,.vt th.hl{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.empty{color:var(--muted)}
+.themebtn{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:max(12px,env(safe-area-inset-bottom,0px));z-index:5}
+[hidden]{display:none!important}
+</style>
+
+<div class="wrap">
+ <header>
+  <div>
+   <h1>Дешифратор шифров</h1>
+   <p class="sub">Вставьте шифртекст. Программа сама определит шифр (Цезарь, простая замена, Вижинер), расшифрует и расставит пробелы между словами.</p>
+  </div>
+  <nav role="tablist" aria-label="Режим">
+   <button role="tab" id="tab-dec" aria-selected="true" data-tab="dec">Расшифровать</button>
+   <button role="tab" id="tab-enc" aria-selected="false" data-tab="enc">Зашифровать</button>
+   <button role="tab" id="tab-ref" aria-selected="false" data-tab="ref">Таблицы</button>
+  </nav>
+ </header>
+
+ <section id="view-dec" class="grid">
+  <div class="panel">
+   <h2>Шифртекст</h2>
+   <div>
+    <label for="cipher">Что расшифровать</label>
+    <textarea id="cipher" spellcheck="false" autocomplete="off"></textarea>
+    <p class="hint">Буквы русского алфавита без Ё. Лишние пробелы в шифртексте Цезаря и Вижинера не мешают. Для шифра №2 вставьте символы или нажмите их ниже.</p>
+   </div>
+   <div class="row">
+    <div>
+     <label for="method">Шифр</label>
+     <select id="method">
+      <option value="auto">Определить автоматически</option>
+      <option value="caesar">Цезарь (сдвиг неизвестен)</option>
+      <option value="table1">Простая замена, шифр №1</option>
+      <option value="table2">Простая замена, шифр №2</option>
+      <option value="vigenere">Вижинер</option>
+     </select>
+    </div>
+    <div>
+     <label for="key">Ключ Вижинера, если знаете</label>
+     <input type="text" id="key" placeholder="например, ЗИМА" autocomplete="off">
+    </div>
+   </div>
+   <button class="btn" id="go" type="button">Расшифровать</button>
+   <details open>
+    <summary>Примеры из лабораторных</summary>
+    <div class="chips" id="examples" style="margin-top:10px"></div>
+   </details>
+   <details>
+    <summary>Символы шифра №2</summary>
+    <div class="chips" id="syms" style="margin-top:10px"></div>
+   </details>
+  </div>
+
+  <div class="panel verdict" aria-live="polite">
+   <h2>Результат</h2>
+   <div class="method"><span class="tag" id="mlabel">—</span><span id="mdetail" class="hint"></span></div>
+   <div class="answer" id="answer"></div>
+   <div class="meter"><span id="conf-text"></span><div class="bar"><i id="conf-bar" style="width:0"></i></div></div>
+   <p class="steps" id="steps"></p>
+   <div><button class="btn ghost small" id="copy" type="button">Скопировать ответ</button></div>
+   <div id="altbox">
+    <h2 style="margin-bottom:8px">Другие варианты</h2>
+    <ul class="alts" id="alts"></ul>
+   </div>
+  </div>
+ </section>
+
+ <section id="view-enc" class="grid" hidden>
+  <div class="panel">
+   <h2>Открытый текст</h2>
+   <div>
+    <label for="plain">Что зашифровать</label>
+    <textarea id="plain" spellcheck="false">Университет, школьный автобус, клавиатура</textarea>
+   </div>
+   <div class="row">
+    <div>
+     <label for="emethod">Шифр</label>
+     <select id="emethod">
+      <option value="table1">Простая замена, шифр №1</option>
+      <option value="table2">Простая замена, шифр №2</option>
+      <option value="vigenere">Вижинер</option>
+      <option value="caesar">Цезарь</option>
+     </select>
+    </div>
+    <div id="ekeybox">
+     <label for="ekey" id="ekeylabel">Ключ</label>
+     <input type="text" id="ekey" value="ЗИМА" autocomplete="off">
+    </div>
+   </div>
+   <div class="chips" id="eexamples"></div>
+  </div>
+  <div class="panel">
+   <h2>Шифртекст</h2>
+   <div class="out" id="eout"></div>
+   <p class="hint" id="enote"></p>
+   <div><button class="btn ghost small" id="ecopy" type="button">Скопировать</button> <button class="btn ghost small" id="eback" type="button">Отправить на расшифровку</button></div>
+  </div>
+ </section>
+
+ <section id="view-ref" hidden style="display:flex;flex-direction:column;gap:20px">
+  <div class="panel">
+   <h2>Таблица простой замены (шифры №1 и №2)</h2>
+   <div class="scroll"><table id="ttable"></table></div>
+   <p class="hint">В таблице нет буквы Й, поэтому при расшифровке она пишется как И, а программа восстанавливает Й по словарю. Знак № в шифре №2 стоит у двух букв, М и Х: программа проверяет оба варианта и выбирает тот, где получается слово.</p>
+  </div>
+  <div class="panel">
+   <h2>Таблица Вижинера, 32 буквы</h2>
+   <div class="scroll" style="max-height:480px"><table class="vt" id="vtable"></table></div>
+   <p class="hint">Буква шифртекста стоит на пересечении столбца буквы открытого текста и строки буквы ключа. Наведите курсор на ячейку.</p>
+  </div>
+ </section>
+</div>
+
+<script>
+const DICT_TEXT = `
+В К С И А О У Я НО НА ПО ИЗ ЗА ОТ ДО ЖЕ ЛИ БЫ НЕ НИ ДА ТО ОН ЕЕ ИХ ЕГО ИЛИ ОНА ОНИ ОНО МЫ ВЫ ТЫ ЧТО КАК ТАК ВСЕ ВСЯ ВСЕХ ВСЕГО ВСЕМ ВЕСЬ ТОТ ТА ТЕ ТЕХ ТЕМ ТОГО ТОМУ ТОЙ ТУ ЭТО ЭТОТ ЭТА ЭТИ ЭТОМ ЭТОГО ЭТОЙ ЭТИХ ЭТИМ
+ЕСЛИ ДЛЯ БЫЛ БЫЛА БЫЛИ БЫЛО БЫТЬ БУДЕТ БУДУТ БУДУ БУДЕМ БУДЕТЕ ЕСТЬ ЕСТЕСТВЕННО ТАМ ТУТ ЗДЕСЬ ГДЕ КОГДА КУДА ОТКУДА ПОЧЕМУ ПОТОМУ ПОЭТОМУ ЧТОБЫ ЧЕМ ПОКА ТОЛЬКО ЕЩЕ УЖЕ ДАЖЕ ТОЖЕ ТАКЖЕ ЛИШЬ ЛИБО
+КОТОРЫЙ КОТОРАЯ КОТОРОЕ КОТОРЫЕ КОТОРЫХ КОТОРЫМ КОТОРОЙ КОТОРОГО КОТОРЫМИ КОТОРОМ КТО КОГО КОМУ КЕМ НИКТО НИЧЕГО НИЧТО НЕЧТО
+ПОСЛЕ ПЕРЕД ПРИ ПОД НАД БЕЗ ЧЕРЕЗ МЕЖДУ ОКОЛО ПРО ИЗО ОБО СО ВО КО НАДО ПОДО ДЛЯ ВОКРУГ ВНУТРИ СНАРУЖИ ВМЕСТЕ ПОЧТИ
+КАЖДЫЙ КАЖДАЯ КАЖДОЕ КАЖДОГО КАЖДОМУ КАЖДЫМ КАЖДЫЕ ДРУГОЙ ДРУГАЯ ДРУГОЕ ДРУГОГО ДРУГИЕ ДРУГИХ ДРУГОМУ ДРУГИМ САМ САМА САМО САМИ САМЫЙ САМОГО
+ОДИН ОДНА ОДНО ОДНОГО ОДНОМУ ОДНИМ ОДНОЙ ОДНИ ДВА ДВЕ ДВУХ ДВУМ ТРИ ТРЕХ ЧЕТЫРЕ ПЯТЬ ШЕСТЬ СЕМЬ ВОСЕМЬ ДЕВЯТЬ ДЕСЯТЬ СТО ТЫСЯЧА ПЕРВЫЙ ВТОРОЙ ТРЕТИЙ
+МОЖЕТ МОГУТ МОЖНО МОЖЕТЕ МОЖЕМ НУЖНО НУЖЕН НУЖНА НАДО ДОЛЖЕН ДОЛЖНА ДОЛЖНЫ ТАКОЙ ТАКАЯ ТАКОЕ ТАКИЕ ТАКИХ КАКОЙ КАКАЯ КАКОЕ КАКИЕ
+НОВЫЙ НОВАЯ НОВОЕ НОВЫЕ НОВЫХ СТАРЫЙ СТАРАЯ ХОРОШИЙ ХОРОШАЯ ХОРОШЕЕ ХОРОШЕЙ ХОРОШО ПЛОХО ЛУЧШЕ ЛУЧШИЙ БОЛЬШОЙ БОЛЬШАЯ БОЛЬШОЕ БОЛЬШИЕ БОЛЬШЕ БОЛЬШИНСТВЕ БОЛЬШИНСТВО МАЛЕНЬКИЙ МЕНЬШЕ МНОГО МНОГИЕ МАЛО ОЧЕНЬ БОЛЕЕ МЕНЕЕ ЛЮБОЙ ЛЮБАЯ ЛЮБОЕ ВАЖНЫЙ ВАЖНО
+ЛЮДИ ЛЮДЕЙ ЧЕЛОВЕК ЧЕЛОВЕКА ЖИЗНЬ ВРЕМЯ ВРЕМЕНИ ДЕНЬ ГОД ГОДА ГОДЫ ЛЕТ МИР МИРА СТРАНА СТРАНЫ СТРАН СЛОВО СЛОВА СЛОВ ДЕЛО РАБОТА РАБОТЫ РАБОТУ МЕСТО ТОЧКА СИСТЕМА СИСТЕМЫ СИСТЕМЕ СИСТЕМУ СИСТЕМАХ СИСТЕМАМИ
+ДОСТУП ДОСТУПА ДОСТУПУ ДОСТУПЕ СЕТЬ СЕТИ СЕТЯМИ СЕТЯХ СЕТЕЙ ПЕРЕДАЧА ПЕРЕДАЧИ ПЕРЕДАЧУ ДАННЫЕ ДАННЫХ ДАННЫМ ДАННЫМИ ИНФОРМАЦИЯ ИНФОРМАЦИИ ИНФОРМАЦИЮ ИНФОРМАЦИЕЙ ЗАЩИТА ЗАЩИТЫ ЗАЩИТУ ЗАЩИТИТЬ ЗАЩИЩЕННЫЙ БЕЗОПАСНОСТЬ БЕЗОПАСНОСТИ УРОВЕНЬ УРОВНЯ УРОВНИ ВОЕННЫЙ ВОЕННОГО ВОЕННЫЕ
+ТЕХНОЛОГИЯ ТЕХНОЛОГИИ ТЕХНОЛОГИЮ ТЕХНОЛОГИЯМ ТЕХНОЛОГИЯМИ ТЕХНОЛОГИЯХ АГЕНТСТВО АГЕНТСТВА АГЕНТСТВ АГЕНТ АГЕНТЫ РАНЕЕ ПОСТЕПЕННО ВСКОРОЕ СКОРО СЕЙЧАС ТЕПЕРЬ ВСЕГДА ИНОГДА НИКОГДА ПОЧТОЙ ПОЧТА БУМАГА БУМАЖНОЕ БУМАЖНЫЙ БУМАЖНАЯ БУМАЖНЫЕ ПИСЬМО ПИСЬМА ПИСЕМ ОБЫЧНЫЙ ОБЫЧНОЕ ОБЫЧНЫЕ ОБЫЧНАЯ ОБЫЧНЫХ
+ЭЛЕКТРОННОЕ ЭЛЕКТРОННЫЙ ЭЛЕКТРОННАЯ ЭЛЕКТРОННЫЕ ЭЛЕКТРОННЫХ ЭЛЕКТРОННОЙ ЭЛЕКТРОННУЮ ЭЛЕКТРОННЫМ ЭЛЕКТРОННОГО ЭЛЕКТРОННАЯ ПОДПИСЬ ПОДПИСИ ПОДПИСЬЮ ПОДПИСЬЮ ПОДПИСАТЬ
+СООБЩЕНИЕ СООБЩЕНИЯ СООБЩЕНИЙ СООБЩЕНИЮ СООБЩЕНИЕМ СООБЩЕНИИ СООБЩЕНИЯМ ЗАМЕНЯТЬ ЗАМЕНИТЬ ЗАМЕНА ЗАМЕНЫ ЗАМЕНУ ДВИЖЕМСЯ ДВИЖЕТСЯ ДВИЖУТСЯ ДВИЖЕНИЕ ПЕРЕСЕЧЕНЫ ПЕРЕСЕКАЮТСЯ СЕКРЕТНЫЕ СЕКРЕТНЫЙ СЕКРЕТНОЕ СЕКРЕТНОГО СЕКРЕТНАЯ СЕКРЕТНОМУ СЕКРЕТНЫХ СЕКРЕТ СЕКРЕТА СЕКРЕТЫ
+ИМЕЮТ ИМЕЕТ ИМЕТЬ ИМЕЛИ ИМЕЛ ИМЕЛА ИМЕЮ ИМЕЕМ ИСПОЛЬЗУЕТСЯ ИСПОЛЬЗУЮТ ИСПОЛЬЗУЕТ ИСПОЛЬЗОВАН ИСПОЛЬЗОВАТЬ ИСПОЛЬЗОВАНА ИСПОЛЬЗОВАНИЕ ИСПОЛЬЗОВАНИЯ ИСПОЛЬЗУЯ ИСПОЛЬЗУЙТЕ
+СТАНДАРТНЫХ СТАНДАРТНЫЙ СТАНДАРТНЫЕ СТАНДАРТНАЯ СТАНДАРТ СТАНДАРТА СВЯЗАННЫХ СВЯЗАННЫЕ СВЯЗАННЫЙ СВЯЗАНЫ СВЯЗЬ СВЯЗИ ВЗАИМНО ВЗАИМНЫЙ ВЗАИМНЫЕ СДЕЛАННЫЙ СДЕЛАННЫЕ СДЕЛАННОЕ СДЕЛАН СДЕЛАТЬ ПОМОЩЬЮ ПОМОЩЬ СОБСТВЕННЫЙ СОБСТВЕННОЕ СОБСТВЕННАЯ СОБСТВЕННЫЕ ОТПРАВИТЕЛЬ ОТПРАВИТЕЛЯ ОТПРАВИТЕЛЮ ОТПРАВИТЕЛЕМ ОТПРАВЛЯЕТ ОТПРАВИТЬ ПОЛУЧАТЕЛЬ ПОЛУЧАТЕЛЯ ПОЛУЧАТЕЛЮ ПОЛУЧАТЕЛЕМ ПОЛУЧИТЬ ПОЛУЧАЕТ
+ДОКАЗЫВАЕТ ДОКАЗАТЬ ДОКАЗАТЕЛЬСТВО ДЕЙСТВИТЕЛЬНО ДЕЙСТВИТЕЛЬНЫЙ ДЕЙСТВИЕ ДЕЙСТВИЯ СОЗДАТЕЛЬ СОЗДАТЕЛЯ СОЗДАТЬ СОЗДАН СОЗДАНА СОЗДАЕТСЯ СОЗДАНИЕ ХРАНЯТСЯ ХРАНИТСЯ ХРАНИТЬ ХРАНЕНИЕ ВИДЕ ВИД ВИДЫ СЕРТИФИКАТ СЕРТИФИКАТОВ СЕРТИФИКАТЫ СЕРТИФИКАТА КОТОРЫЕ ВКЛЮЧАЮТ ВКЛЮЧАЕТ ВКЛЮЧИТЬ ВКЛЮЧАЯ СЕБЯ СЕБЕ СОБОЙ ИДЕНТИФИКАТОР ИДЕНТИФИКАТОРА ИДЕНТИФИКАЦИЯ ПОЛЬЗОВАТЕЛЬ ПОЛЬЗОВАТЕЛЯ ПОЛЬЗОВАТЕЛЮ ПОЛЬЗОВАТЕЛИ ПОЛЬЗОВАТЕЛЕЙ ПОЛЬЗОВАТЕЛЕМ
+КРИПТОГРАФИЯ КРИПТОГРАФИИ КРИПТОГРАФИЮ КРИПТОГРАФИЕЙ КРИПТОГРАФИЧЕСКИЙ КРИПТОГРАФИЧЕСКАЯ КРИПТОГРАФИЧЕСКОЕ КРИПТОГРАФИЧЕСКИЕ КРИПТОГРАФИЧЕСКОЙ КРИПТОГРАФИЧЕСКИХ КРИПТОГРАФИЧЕСКИМ КРИПТОГРАФИЧЕСКИМИ КРИПТОГРАФИЧЕСКОГО КРИПТОГРАФИЧЕСКУЮ КРИПТОАНАЛИЗ КРИПТОАНАЛИЗА КРИПТОЛОГИЯ КРИПТОЛОГИИ КРИПТОСИСТЕМА КРИПТОСИСТЕМЫ КРИПТОСИСТЕМЕ
+ШИФР ШИФРА ШИФРЫ ШИФРУ ШИФРОМ ШИФРЕ ШИФРОВ ШИФРОВАНИЕ ШИФРОВАНИЯ ШИФРОВАНИИ ШИФРОВАНИЕМ ШИФРОВКА ШИФРОВКИ ШИФРОВКУ ШИФРУЕТ ШИФРУЮТ ШИФРОВАТЬ ШИФРОВАН ШИФРОВАННЫЙ ШИФРОВАННЫЕ ШИФРОВАННОЕ ДЕШИФРУЕТ ДЕШИФРОВАТЬ ДЕШИФРОВАНИЕ ДЕШИФРОВКА РАСШИФРОВКА РАСШИФРОВКИ РАСШИФРОВКУ РАСШИФРОВАТЬ РАСШИФРОВЫВАЕТ РАСШИФРУЕТ ЗАШИФРОВАТЬ ЗАШИФРОВАН ЗАШИФРОВАННЫЙ
+КЛЮЧ КЛЮЧА КЛЮЧЕЙ КЛЮЧИ КЛЮЧОМ КЛЮЧЕ КЛЮЧУ КЛЮЧАМИ КЛЮЧАМ КЛЮЧАХ ЦЕЗАРЬ ЦЕЗАРЯ ЦЕЗАРЕМ ВИЖИНЕР ВИЖИНЕРА СДВИГ СДВИГА СДВИГОМ ОТКРЫТЫЙ ОТКРЫТЫХ ОТКРЫТЫМ ОТКРЫТЫЕ ОТКРЫТОГО ОТКРЫТОМ ОТКРЫТАЯ ОТКРЫТОЕ ОТКРЫТОЙ ОТКРЫТУЮ ЗАКРЫТЫЙ ЗАКРЫТЫЕ ЗАКРЫТЫМ ЗАКРЫТОГО ПУБЛИЧНЫЙ ПРИВАТНЫЙ ПРИВАТНЫЕ ЗАКРЫТЫХ КОД КОДА КОДЫ КОДОМ ДВА СВЯЗАННЫХ
+АЛГОРИТМ АЛГОРИТМА АЛГОРИТМЫ АЛГОРИТМОВ АЛФАВИТ АЛФАВИТА БУКВА БУКВЫ БУКВ БУКВУ СИМВОЛ СИМВОЛЫ СИМВОЛОВ ТЕКСТ ТЕКСТА ТЕКСТУ ТЕКСТЫ ТЕКСТОМ ТЕКСТОВ ТАБЛИЦА ТАБЛИЦЫ ТАБЛИЦУ ТАБЛИЦЕ СИММЕТРИЧНЫЙ СИММЕТРИЧНАЯ СИММЕТРИЧНЫЕ АСИММЕТРИЧНЫЙ АСИММЕТРИЧНАЯ АСИММЕТРИЧНЫЕ ПРОСТОЙ ПРОСТАЯ ПРОСТОЕ ПРОСТЫЕ СЛОЖНЫЙ
+УНИВЕРСИТЕТ УНИВЕРСИТЕТА УНИВЕРСИТЕТЕ УНИВЕРСИТЕТЫ ШКОЛА ШКОЛЫ ШКОЛЬНЫЙ ШКОЛЬНАЯ ШКОЛЬНИК АВТОБУС АВТОБУСА АВТОБУСЫ АВТОМОБИЛЬ КЛАВИАТУРА КЛАВИАТУРЫ КЛАВИАТУРУ КОМПЬЮТЕР КОМПЬЮТЕРА КОМПЬЮТЕРЫ БИБЛИОТЕКА БИБЛИОТЕКИ БИБЛИОТЕКУ НЕЙРОННЫЕ НЕЙРОННАЯ НЕЙРОННЫХ НЕЙРОННЫЙ НЕЙРОН СЕТИ РЕГИОНАЛЬНЫЙ РЕГИОНАЛЬНАЯ РЕГИОНАЛЬНЫЕ КЛАД КЛАДА ЗАРЫТ ЗАРЫТЬ САДУ САД САДА САДЫ ЗИМА ЗИМЫ ЖУБАНОВ ЖУБАНОВА ЖУБАНОВУ
+ВЗРЫВ ВЗРЫВА ВЗРЫВЫ БЛОК БЛОКА БЛОКИ УСТРОЙСТВО УСТРОЙСТВА УСТРОЙСТВ ВВОД ВВОДА ВЫВОД ВЫВОДА ПАМЯТЬ ПАМЯТИ ПРОГРАММА ПРОГРАММЫ ПРОГРАММУ ПРОГРАММИСТ ПРОГРАММИРОВАНИЕ ДАННЫЕ ИНТЕРНЕТ ИНТЕРНЕТА САЙТ САЙТА ФАЙЛ ФАЙЛА ФАЙЛЫ ПАРОЛЬ ПАРОЛЯ ПАРОЛИ ЗАЩИТА ВЗЛОМ ВЗЛОМАТЬ АТАКА АТАКИ АНАЛИЗ АНАЛИЗА МЕТОД МЕТОДА МЕТОДЫ МЕТОДОВ ЗАДАЧА ЗАДАЧИ ЗАДАНИЕ ОТВЕТ ОТВЕТА ВОПРОС ВОПРОСА РЕШЕНИЕ РЕШЕНИЯ ПРИМЕР ПРИМЕРА ПРИМЕРЫ РЕЗУЛЬТАТ РЕЗУЛЬТАТА ЛАБОРАТОРНАЯ РАБОТА ПРАКТИЧЕСКАЯ ПРАКТИКА
+ПРИВЕТ МИР ДОБРО ПОЖАЛОВАТЬ СПАСИБО ПОЖАЛУЙСТА ДА НЕТ ЗНАНИЕ ЗНАНИЯ УЧИТЬ УЧИТЕЛЬ СТУДЕНТ СТУДЕНТЫ ЗАНЯТИЕ ЭКЗАМЕН ЗАЧЕТ ОЦЕНКА КНИГА КНИГИ ДОМ ДОМА ГОРОД ГОРОДА КАЗАХСТАН ВСТРЕЧА ВСТРЕЧАЕМСЯ ЗАВТРА СЕГОДНЯ ВЧЕРА УТРО УТРОМ ВЕЧЕР ВЕЧЕРОМ НОЧЬ ДРУГ ДРУЗЬЯ ДРУГА СЕМЬЯ ВОДА ОГОНЬ ЗЕМЛЯ НЕБО СОЛНЦЕ ЛУНА ЗВЕЗДА ЧЕЛОВЕЧЕСТВО ИСТОРИЯ ИСТОРИИ ДРЕВНИЙ ДРЕВНИЕ ДАВНО ВОЙНА МИРОВЫХ МИРОВОЙ СОВРЕМЕННАЯ СОВРЕМЕННЫЙ
+ЭТОТ ПРИХОДИТ ПРИХОДИТЬ ИДЕТ ИДУТ ДЕЛАТЬ ДЕЛАЕТ ДЕЛАЮТ СДЕЛАТЬ ГОВОРИТЬ ГОВОРИТ СКАЗАТЬ СКАЗАЛ ЗНАТЬ ЗНАЕТ ЗНАЮТ ХОТЕТЬ ХОЧЕТ ХОЧУ ВИДЕТЬ ВИДИТ БЕРЕТ ДАЕТ ДАТЬ ВЗЯТЬ СТАТЬ СТАНЕТ СТАЛО СТАЛИ СТАЛ ОСТАЕТСЯ ПОЛУЧАЕТСЯ НАЧАЛО НАЧАТЬ КОНЕЦ КОНЦА СЛУЧАЕ СЛУЧАЙ ЧАСТО РЕДКО ТАКИМ ОБРАЗОМ ОБРАЗОМ ПРОЦЕСС ПРОЦЕССА ПРОЦЕССЕ ОПЕРАЦИЯ ОПЕРАЦИИ ПОЛУЧЕНИЯ ПОЛУЧЕНИЕ ПЕРЕДАЕТСЯ ПЕРЕДАЧЕ
+СВОЕМ СВОЙ СВОЯ СВОЕ СВОИ СВОИХ СВОИМ СВОЕГО СВОЕЙ СВОИМИ ЛИМОН ЛИМОНА ИМЯ ИМЕНИ ИМЕНА ТАЙНА ТАЙНЫ ТАЙНУ ЛЕС ЛЕСА ЛЕТО ВЕСНА ОСЕНЬ МАМА ПАПА ВЕСНОЙ ЗИМОЙ ЗИМУ ЛЕТОМ
+КЛЮЧ_И_ДЛЯ ТОТ_ЖЕ
+СИММЕТРИЧНОЙ АСИММЕТРИЧНОЙ ДЕШИФРОВАНИЯ ДЕШИФРОВАНИИ КРИПТОСИСТЕМЕ
+`;
+
+const A = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ";
+const N = 32;
+const LAT = {A:'А',B:'В',C:'С',E:'Е',H:'Н',K:'К',M:'М',O:'О',P:'Р',T:'Т',X:'Х',Y:'У'};
+const FREQ = {'О':.109,'Е':.085,'А':.080,'И':.074,'Н':.067,'Т':.063,'С':.055,'Р':.047,'В':.045,'Л':.044,'К':.035,'М':.032,'Д':.030,'П':.028,'У':.026,'Я':.020,'Ы':.019,'Ь':.017,'Г':.017,'З':.016,'Б':.015,'Ч':.014,'Й':.010,'Х':.009,'Ж':.008,'Ш':.007,'Ю':.006,'Ц':.005,'Щ':.004,'Э':.003,'Ф':.003,'Ъ':.0004};
+const LN = {}; for (const c of A) LN[c] = Math.log(FREQ[c]);
+
+// Таблица простой замены из задания: [открытый текст, шифр 1, шифр 2]
+const TABLE = [
+ ['А','В','^'],['Б','И','@'],['В','О',')'],['Г','А','+'],['Д','Щ','<'],['Е','П','>'],['Ж','К','∀'],['З','Б','♦'],['И','Ъ','*'],['К',' ','♥'],['Л','Р','♠'],
+ ['М','Т','№'],['Н','Ц','#'],['О','.','-'],['П','Ж','='],['Р','Г','('],['С','Л','?'],['Т','Х','%'],['У','С','⊗'],['Ф','Ь','!'],['Х','Ч','№'],['Ц','З','®'],
+ ['Ч','М','Σ'],['Ш','У','▽'],['Щ','Д','Υ'],['Ъ','Э','⋈'],['Ы','Н','⊕'],['Ь','Ю','×'],['Э','Ы','ω'],['Ю','Ш','$'],['Я','Е','Δ'],[' ','Ф','∞'],['.','Я','♣']
+];
+const ENC1 = {}, ENC2 = {}, DEC1 = {}, DEC2 = {};
+for (const [p,c1,c2] of TABLE) {
+  ENC1[p]=c1; ENC2[p]=c2; DEC1[c1]=p;
+  (DEC2[c2] = DEC2[c2] || []).push(p);
+}
+ENC1['Й']='Ъ'; ENC2['Й']='*'; // в таблице нет Й: пишем как И
+const SYM2 = new Set(Object.keys(DEC2));
+const SYM_ALIAS = {'♯':'#','∇':'▽','△':'Δ','∆':'Δ','◎':'⊕','–':'-','—':'-','−':'-','♡':'♥','♤':'♠','♧':'♣','♢':'♦','Ɐ':'∀','Ω':'ω','ϒ':'Υ','Ƴ':'Υ','⨝':'⋈','ℵ':'⋈','✕':'×','✖':'×','∑':'Σ','Ⓡ':'®','⨂':'⊗','∧':'^'};
+
+const SHOW = {};
+const DICT = new Set(DICT_TEXT.split(/\s+/).filter(Boolean).map(w => { const p = w.replace(/_/g,''); if (p !== w) SHOW[p] = w.replace(/_/g,' '); return p; }));
+let MAXW = 0; for (const w of DICT) if (w.length > MAXW) MAXW = w.length;
+const DICTY = new Set([...DICT].map(w => w.replace(/Й/g,'И')));
+const FUNC = new Set(['И','В','К','С','О','У','А','НА','ПО','ИЗ','ЗА','ОТ','ДО','НО','НЕ']);
+const gain = w => w.length * w.length;
+const KEYWORDS = [...DICT].filter(w => w.length >= 3 && w.length <= 12);
+
+const norm = s => s.toUpperCase().replace(/Ё/g,'Е').replace(/[A-Z]/g, c => LAT[c] || c);
+const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
+const idx = c => A.indexOf(c);
+
+// расстановка пробелов по словарю (динамическое программирование)
+function segment(run, y) {
+  const n = run.length, best = new Array(n+1).fill(0), prev = new Array(n+1).fill(-1), isW = new Array(n+1).fill(false);
+  for (let i = 1; i <= n; i++) {
+    best[i] = best[i-1]; prev[i] = i-1; isW[i] = false;
+    for (let L = 1; L <= Math.min(MAXW, i); L++) {
+      const w = run.slice(i-L, i);
+      if ((y ? DICTY : DICT).has(w)) {
+        const g = best[i-L] + gain(w);
+        if (g > best[i]) { best[i] = g; prev[i] = i-L; isW[i] = true; }
+      }
+    }
+  }
+  const parts = []; let covered = 0, i = n;
+  while (i > 0) {
+    const j = prev[i], piece = run.slice(j, i);
+    if (isW[i]) { if (piece.length >= 3) covered += piece.length; parts.push({t:piece, w:true}); }
+    else if (parts.length && !parts[parts.length-1].w) parts[parts.length-1].t = piece + parts[parts.length-1].t;
+    else parts.push({t:piece, w:false});
+    i = j;
+  }
+  parts.reverse();
+  for (let k = 0; k < parts.length; k++) {
+    const p = parts[k];
+    if (p.w && p.t.length === 1 && ((parts[k-1] && !parts[k-1].w) || (parts[k+1] && !parts[k+1].w))) {
+      if (k > 0 && !parts[k-1].w) { parts[k-1].t += p.t; parts.splice(k,1); k--; }
+      else { parts[k+1].t = p.t + parts[k+1].t; parts.splice(k,1); k--; }
+    }
+  }
+  return {text: parts.map(p => SHOW[p.t] || p.t).join(' '), covered};
+}
+
+// восстановление Й там, где таблица шифра её не различает с И
+function fixY(word) {
+  if (DICT.has(word) || word.indexOf('И') < 0) return word;
+  const pos = []; for (let i = 0; i < word.length; i++) if (word[i] === 'И') pos.push(i);
+  if (pos.length > 5) return word;
+  for (let m = 1; m < (1 << pos.length); m++) {
+    const a = word.split('');
+    pos.forEach((p,k) => { if (m & (1<<k)) a[p] = 'Й'; });
+    if (DICT.has(a.join(''))) return a.join('');
+  }
+  return word;
+}
+
+// итог: красивый текст + оценка
+function finish(plain, opts = {}) {
+  let letters = 0, covered = 0, ll = 0;
+  const out = plain.replace(/[А-Я]+/g, run => {
+    const r = run;
+    const seg = segment(r, !!opts.y);
+    letters += r.length; covered += seg.covered;
+    for (const c of r) ll += LN[c];
+    let t = seg.text;
+    if (opts.y) t = t.split(' ').map(fixY).join(' ');
+    return t;
+  });
+  let text = out;
+  if (!opts.keepPunct) text = text.replace(/([,;:!?])(?=[^\s])/g, '$1 ');
+  text = text.replace(/ {2,}/g, ' ').trim();
+  if (!letters) return {text, score:0, cov:0};
+  const avg = ll / letters, cov = covered / letters;
+  const s1 = clamp((avg + 3.47) / 0.55, 0, 1);
+  return {text, score: 0.45*s1 + 0.55*cov, cov, avg, letters};
+}
+
+function llOnly(letters) { let s = 0; for (const c of letters) s += LN[c]; return s / letters.length; }
+
+// --- шифры ---
+function shiftText(s, k) { // k>0 — вперёд по алфавиту
+  let o = '';
+  for (const ch of s) { const i = idx(ch); o += i < 0 ? ch : A[((i + k) % N + N) % N]; }
+  return o;
+}
+function vig(s, key, dir) { // dir=+1 шифрование, -1 расшифровка
+  let o = '', j = 0; const k = [...key].map(idx);
+  for (const ch of s) {
+    const i = idx(ch);
+    if (i < 0) { o += ch; continue; }
+    o += A[((i + dir * k[j % k.length]) % N + N) % N]; j++;
+  }
+  return o;
+}
+function cleanKey(k) { return [...norm(k || '')].filter(c => idx(c) >= 0).join(''); }
+// для букв шифра убираем пробелы (они в таких заданиях случайные), остальные знаки оставляем
+function stripSpaces(s) { return s.replace(/\s+/g, ''); }
+function lettersOf(s) { return s.replace(/[^А-Я]/g, ''); }
+
+function encryptTable(text, which) {
+  const m = which === 1 ? ENC1 : ENC2; let o = '';
+  for (const ch0 of text.toUpperCase().replace(/Ё/g,'Е')) {
+    const ch = norm(ch0);
+    o += (ch in m) ? m[ch] : ch;
+  }
+  return o;
+}
+function decodeTable(raw, which) {
+  const cands = [];
+  if (which === 1) {
+    const s = norm(raw.replace(/\r?\n/g,' '));
+    let o = '';
+    for (const ch of s) o += (ch in DEC1) ? DEC1[ch] : '?';
+    return [o];
+  }
+  let s = ''; for (const ch of raw) s += SYM_ALIAS[ch] || ch;
+  s = s.replace(/\s+/g, '');
+  let outs = [''];
+  for (const ch of s) {
+    const o = DEC2[ch];
+    if (!o) { outs = outs.map(x => x + '?'); continue; }
+    if (o.length === 1) outs = outs.map(x => x + o[0]);
+    else if (outs.length < 64) outs = outs.flatMap(x => o.map(c => x + c));
+    else outs = outs.map(x => x + o[0]);
+  }
+  return outs;
+}
+
+// --- главный разбор ---
+function analyze(raw, o = {}) {
+  const method = o.method || 'auto', userKey = cleanKey(o.key);
+  const res = [];
+  const add = (label, detail, plain, extra = {}) => {
+    const f = finish(plain, extra);
+    res.push({label, detail, text: f.text, score: f.score, cov: f.cov, plain, ...extra});
+  };
+  const hasSym2 = [...raw].some(ch => SYM2.has(SYM_ALIAS[ch] || ch) && !/[А-Яа-яЁё\s.]/.test(ch) || (SYM_ALIAS[ch] && !/[А-Яа-яЁё\s.]/.test(ch)));
+  const use = m => method === 'auto' || method === m;
+
+  if (hasSym2 && use('table2')) {
+    let best = null;
+    for (const p of decodeTable(raw, 2)) {
+      const f = finish(p, {keepPunct:true, y:true});
+      if (!best || f.score > best.f.score) best = {p, f};
+    }
+    res.push({label:'Простая замена, шифр №2', detail:'символы заменены по таблице', text:best.f.text, score:best.f.score, plain:best.p});
+  }
+  if (!hasSym2) {
+    const letters = lettersOf(norm(raw));
+    // шифр №1
+    if (use('table1')) {
+      const p = decodeTable(raw, 1)[0];
+      if (!p.includes('?')) {
+        const f = finish(p, {keepPunct:true, y:true});
+        res.push({label:'Простая замена, шифр №1', detail:'символы заменены по таблице', text:f.text, score:f.score, plain:p});
+      }
+    }
+    if (letters.length >= 3) {
+      const base = stripSpaces(norm(raw));
+      if (use('caesar')) {
+        for (let k = 1; k < N; k++) {
+          const p = shiftText(base, -k);
+          add('Шифр Цезаря', `сдвиг ${k}`, p, {shift:k});
+        }
+      }
+      if (use('vigenere')) {
+        const cl = lettersOf(base);
+        if (userKey) {
+          add('Шифр Вижинера', `ключ ${userKey} (указан вами)`, vig(base, userKey, -1), {key:userKey, given:true});
+        } else {
+          const tried = new Map();
+          const consider = key => { if (!tried.has(key)) tried.set(key, vig(base, key, -1)); };
+          // 1) ключи-слова из словаря
+          const pre = [];
+          for (const w of KEYWORDS) { const p = vig(cl, w, -1); pre.push([llOnly(p), w]); }
+          pre.sort((a,b) => b[0]-a[0]);
+          pre.slice(0, 40).forEach(x => consider(x[1]));
+          // 2) статистический подбор для длин ключа 2..14
+          const maxL = Math.min(14, Math.floor(cl.length / 5));
+          const ics = [];
+          for (let L = 2; L <= maxL; L++) {
+            let tot = 0;
+            for (let c = 0; c < L; c++) {
+              const cnt = new Array(N).fill(0); let m = 0;
+              for (let i = c; i < cl.length; i += L) { cnt[idx(cl[i])]++; m++; }
+              tot += m > 1 ? cnt.reduce((a,x) => a + x*(x-1), 0) / (m*(m-1)) : 0;
+            }
+            ics.push([L, tot / L]);
+          }
+          const Ls = new Set();
+          const first = ics.find(x => x[1] >= 0.045); if (first) Ls.add(first[0]);
+          [...ics].sort((a,b) => b[1]-a[1]).slice(0, 2).forEach(x => Ls.add(x[0]));
+          for (const L of Ls) {
+            let key = '';
+            for (let c = 0; c < L; c++) {
+              let bs = -1e9, bk = 0;
+              for (let k = 0; k < N; k++) {
+                let sc = 0;
+                for (let i = c; i < cl.length; i += L) sc += LN[A[((idx(cl[i]) - k) % N + N) % N]];
+                if (sc > bs) { bs = sc; bk = k; }
+              }
+              key += A[bk];
+            }
+            consider(key);
+          }
+          for (const [key, p] of tried) {
+            if (/^(.)\1*$/.test(key)) continue; // ключ из одной буквы — это Цезарь
+            add('Шифр Вижинера', `ключ ${key}`, p, {key});
+          }
+        }
+      }
+    }
+  }
+  res.sort((a,b) => b.score - a.score);
+  // убираем повторы одного и того же текста
+  const seen = new Set(), uniq = [];
+  for (const r of res) { const k = r.text.replace(/\s/g,''); if (seen.has(k)) continue; seen.add(k); uniq.push(r); }
+  return uniq;
+}
+
+
+(function(){
+  const $ = id => document.getElementById(id);
+  const LS = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+  // вкладки
+  const tabs = ['dec','enc','ref'];
+  function showTab(t){
+    tabs.forEach(x => { $('view-'+x).hidden = x !== t; $('tab-'+x).setAttribute('aria-selected', x === t); });
+    $('view-ref').style.display = t === 'ref' ? 'flex' : '';
+    LS.set('tab', t);
+  }
+  tabs.forEach(t => $('tab-'+t).addEventListener('click', () => showTab(t)));
+
+  // ---------- расшифровка ----------
+  const state = {list:[], cur:0};
+  function conf(score){
+    if (score >= .65) return ['Высокая уверенность','' ];
+    if (score >= .45) return ['Средняя уверенность','mid'];
+    return ['Низкая уверенность: проверьте результат или укажите шифр и ключ','low'];
+  }
+  function sample(r){
+    if (r.shift) {
+      const c = [...$('cipher').value.toUpperCase().replace(/[^А-ЯЁ]/g,'')].slice(0,4).join('');
+      if (c) return `Каждая буква сдвинута вперёд на ${r.shift} по алфавиту, поэтому для расшифровки двигаем назад: ${c} → ${shiftText(norm(c), -r.shift)}.`;
+    }
+    if (r.key) return `Ключ ${r.key} повторяется под шифртекстом. Каждую букву сдвигаем назад на номер буквы ключа в алфавите (А=0, Б=1, …, Я=31).`;
+    if (r.label.indexOf('замена') >= 0) return 'Каждый символ шифртекста найден в таблице замены и заменён на букву открытого текста.';
+    return '';
+  }
+  function render(){
+    const r = state.list[state.cur];
+    if (!r) {
+      $('mlabel').textContent = '—'; $('mdetail').textContent = '';
+      $('answer').innerHTML = '<span class="empty">Вставьте шифртекст слева, ответ появится здесь.</span>';
+      $('conf-text').textContent = ''; $('conf-bar').style.width = '0'; $('steps').textContent = ''; $('alts').innerHTML = ''; $('altbox').hidden = true; return;
+    }
+    $('mlabel').textContent = r.label; $('mdetail').textContent = r.detail;
+    $('answer').textContent = r.text;
+    const [t, cls] = conf(r.score);
+    $('conf-text').textContent = t + ' · ' + Math.round(r.score*100) + '%';
+    const b = $('conf-bar'); b.style.width = Math.max(4, Math.round(r.score*100)) + '%'; b.className = cls;
+    $('steps').textContent = sample(r);
+    const alts = state.list.map((x,i) => [x,i]).filter(([x,i]) => i !== state.cur && x.score >= 0.35).slice(0,5);
+    $('altbox').hidden = !alts.length;
+    $('alts').innerHTML = '';
+    alts.forEach(([x,i]) => {
+      const li = document.createElement('li'), bt = document.createElement('button'); bt.type = 'button';
+      bt.innerHTML = '<b></b><span></span>';
+      bt.firstChild.textContent = x.label + ', ' + x.detail + ' · ' + Math.round(x.score*100) + '%';
+      bt.lastChild.textContent = x.text.length > 90 ? x.text.slice(0,90) + '…' : x.text;
+      bt.addEventListener('click', () => { state.cur = i; render(); });
+      li.appendChild(bt); $('alts').appendChild(li);
+    });
+  }
+  function run(){
+    const raw = $('cipher').value;
+    if (!raw.trim()) { state.list = []; render(); return; }
+    state.list = analyze(raw, {method:$('method').value, key:$('key').value}); state.cur = 0;
+    if (!state.list.length) {
+      $('answer').textContent = 'Не удалось подобрать расшифровку. Проверьте выбранный шифр и символы.';
+      $('mlabel').textContent = '—'; $('mdetail').textContent = ''; $('alts').innerHTML = ''; $('altbox').hidden = true; $('conf-text').textContent = ''; $('conf-bar').style.width = '0'; $('steps').textContent = ''; return;
+    }
+    render();
+  }
+  let tm; const later = () => { clearTimeout(tm); tm = setTimeout(run, 300); };
+  $('cipher').addEventListener('input', later); $('key').addEventListener('input', later); $('method').addEventListener('change', run);
+  $('go').addEventListener('click', run);
+  async function copy(text, btn){
+    const old = btn.textContent;
+    try { await navigator.clipboard.writeText(text); btn.textContent = 'Скопировано'; }
+    catch(e){ const r = document.createRange(); r.selectNodeContents(btn.id === 'copy' ? $('answer') : $('eout')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = 'Выделено, скопируйте'; }
+    setTimeout(() => btn.textContent = old, 1600);
+  }
+  $('copy').addEventListener('click', () => { const r = state.list[state.cur]; if (r) copy(r.text, $('copy')); });
+
+  // примеры
+  const V = [
+   'ИЦРХЭЫЩШШЩРЬЩЩМДРШУРМЮПРЭЪЩЬЭРЪРШШЩТ ЛЧ РШКЭЗЩМЖВШЩРМЮЧЛСШЩРЬЩЩМДРШУР',
+   'ФГМКРОНФЩЗТЪЦФЫКШНФНХРТЦЛМИЩЪШИХГЙЫМЫ ЪЧНШНЩН ЯНХГЩНЪЗФРЧНШНМИЯРМИХХГЭ',
+   'ВЦЫБЦГЮМЦСФЦЮГВГУСЩЭЦПГХЯВГДАЫЖЯБЯЙЦЪЫ БЩАГЯФБСЕ ЩИЦВЫЯЪГЦЖЮЯЬЯФЩЩ',
+   'КЭЧУЙЧБЗЪАДЮНЮКБИЭКЗШФДЙНОЮБМЬЙББЙБДИБЗД АКНОПЛЬЖЖ МДЛОКЯМЬРДУБНЖДИОБСЙКЗКЯДЫИЮКБЙЙКЯКПМКЮ ЙЫ',
+   'ТБВРЭФРАВЭЛЕЪАШЯВЮУАРДШЗХБЪШЕБШБВХЬРЕШБЯ ЮЫМЧГХВБП ЮФШЭШВЮВЦХЪЫОЗШФЫПИШДАЮТРЭШПШФЫПАРБ ИШДАЮТЪШ',
+   'ШАЖЮЕИДЩЖЦКЮНЫЗАДЯЗЮЗИЫВЫЗДИАЖСИСВАБФ НДВАЦЬЪСЯЮ ВЫЫИЪШЦЗШХЭЦГГСЛШЭЦЮВГДАБФНЦ',
+   'ШОФТЙЧШЩМЕТУЖЦВЮБУАШЬТ,ЯТУЩОЫЫЙЧЯЭЬЪЬЗ КМТЮБСЬСЬ ШЩМЕО',
+   'ПМЯПРАГЛЛЩЗПГИОГРЛЩЗИЙЬХМРНОЮАЖРГЙЭКМДГР ЯЩРЪЖПНМЙ ЪЕМАЮЛВЙЭЦЖТОМАИЖПММЯЧГЛЖЭ',
+   'ЙЧСЦЮЬЪЩЩМЛЫЪРЫФЭИЭЪЪНЕСЩФЛРЪЦМУЗОМСЮ ГЮЪЪЮЫЬМО ФЮСЧСШНЗЧРСХЭЮОФЮСЧИЩЪЭЪУРМЮСЧИЭЪЪНЕС ЩФЛ',
+   'ЖКВИУКУЭВГЦПАНИШЕЧКЙЧЪЪАЬЭЙЭИКАМАВШКЖЪВ ГЦПЭБВЖКЖ ИУЭЪВГЦПШЦКЪЙЭЩЧАЬЭЕКАМАВШКЖИЗЖГФЯЖЪШК ЭГЧ'];
+  const EX = V.map((t,i) => ['Цезарь, вариант ' + (i+1), t, {}]).concat([
+   ['Замена №1 (а)','И.РЮУ.ЪФОБГНО',{}],['Замена №1 (б)','CЛХГ.ЪЛХО.ФОО.ЩВ',{}],
+   ['Замена №2 (а)','▽*!(∞♦^№>#⊕',{}],['Замена №2 (б)','@♠-♥∞▽*!(-)^#*Δ',{}],
+   ['Вижинер, ключ ЗИМА', vig('КЛАДЗАРЫТВСАДУ','ЗИМА',1), {key:'ЗИМА'}],
+   ['Вижинер, без ключа', vig('ВСИММЕТРИЧНОЙКРИПТОСИСТЕМЕДЛЯШИФРОВАНИЯИДЕШИФРОВАНИЯИНФОРМАЦИИИСПОЛЬЗУЕТСЯОДИНКЛЮЧ','ЛИМОН',1), {}]]);
+  EX.forEach(([name, text, o]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = name;
+    b.addEventListener('click', () => { $('cipher').value = text; $('method').value = 'auto'; $('key').value = ''; run(); });
+    $('examples').appendChild(b);
+  });
+  [...new Set(TABLE.map(r => r[2]))].filter(x => x !== ' ').forEach(sy => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'sym'; b.textContent = sy;
+    b.addEventListener('click', () => { const t = $('cipher'); const p = t.selectionStart || t.value.length; t.value = t.value.slice(0,p) + sy + t.value.slice(t.selectionEnd || p); t.focus(); t.selectionStart = t.selectionEnd = p + sy.length; later(); });
+    $('syms').appendChild(b);
+  });
+
+  // ---------- шифрование ----------
+  function enc(){
+    const p = $('plain').value, m = $('emethod').value, k = $('ekey').value;
+    $('ekeybox').hidden = m === 'table1' || m === 'table2';
+    $('ekeylabel').textContent = m === 'caesar' ? 'Сдвиг (1–31)' : 'Ключ (слово)';
+    let o = '', note = '';
+    if (m === 'table1' || m === 'table2') {
+      o = encryptTable(p, m === 'table1' ? 1 : 2);
+      note = 'Пробел и точка тоже шифруются по таблице. Знаки, которых нет в таблице (например, запятая), остаются как есть.';
+    } else {
+      const s = stripSpaces(norm(p)).replace(/[^А-Я]/g,'');
+      if (m === 'caesar') { const sh = ((parseInt(k,10) || 0) % 32 + 32) % 32; o = shiftText(s, sh); note = 'Пробелы и знаки убраны, сдвиг ' + sh + '.'; }
+      else { const kk = cleanKey(k); o = kk ? vig(s, kk, 1) : ''; note = kk ? 'Пробелы и знаки убраны. Ключ повторяется по кругу: ' + kk + '.' : 'Введите ключ из русских букв.'; }
+    }
+    $('eout').textContent = o; $('enote').textContent = note;
+  }
+  ['plain','ekey'].forEach(id => $(id).addEventListener('input', enc));
+  $('emethod').addEventListener('change', () => { if ($('emethod').value === 'caesar' && !/^\d+$/.test($('ekey').value)) $('ekey').value = '3'; if ($('emethod').value === 'vigenere' && /^\d+$/.test($('ekey').value)) $('ekey').value = 'ЗИМА'; enc(); });
+  $('ecopy').addEventListener('click', () => copy($('eout').textContent, $('ecopy')));
+  $('eback').addEventListener('click', () => { $('cipher').value = $('eout').textContent; $('method').value = 'auto'; $('key').value = ''; showTab('dec'); run(); });
+  [['Лаб. 1: университет','Университет, школьный автобус, клавиатура','table1',''],
+   ['Лаб. 1: шифр №2','Университет, школьный автобус, клавиатура','table2',''],
+   ['Вижинер: клад, ключ ЗИМА','Клад зарыт в саду','vigenere','ЗИМА'],
+   ['Вижинер: Жубанов','Региональный университет','vigenere','Жубанов'],
+   ['Вижинер: компьютер','Компьютер, библиотека, нейронные сети','vigenere','КЛЮЧ']].forEach(([n,t,m,k]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = n;
+    b.addEventListener('click', () => { $('plain').value = t; $('emethod').value = m; if (k) $('ekey').value = k; enc(); });
+    $('eexamples').appendChild(b);
+  });
+
+  // ---------- таблицы ----------
+  (function(){
+    let h = '<tr><th>Откр.</th><th>Шифр 1</th><th>Шифр 2</th></tr>';
+    const sh = c => c === ' ' ? '␣' : c;
+    h = ''; const rows = TABLE.length;
+    let t = '<tr>' + '<th>Откр.</th><th>Шифр 1</th><th>Шифр 2</th>'.repeat(3) + '</tr>';
+    for (let i = 0; i < 11; i++) { t += '<tr>'; for (let c = 0; c < 3; c++) { const r = TABLE[c*11 + i]; t += `<td>${sh(r[0])}</td><td>${sh(r[1])}</td><td>${r[2]}</td>`; } t += '</tr>'; }
+    $('ttable').innerHTML = t;
+    let v = '<tr><th></th>' + [...A].map(c => `<th data-c="${c}">${c}</th>`).join('') + '</tr>';
+    for (let k = 0; k < 32; k++) { v += `<tr><th data-r="${k}">${A[k]}</th>`; for (let p = 0; p < 32; p++) v += `<td data-r="${k}" data-c="${A[p]}">${A[(p+k)%32]}</td>`; v += '</tr>'; }
+    const vt = $('vtable'); vt.innerHTML = v;
+    vt.addEventListener('mouseover', e => {
+      const td = e.target.closest('td'); vt.querySelectorAll('.hl').forEach(x => x.classList.remove('hl'));
+      if (!td) return;
+      vt.querySelector(`th[data-r="${td.dataset.r}"]`).classList.add('hl'); vt.querySelector(`tr:first-child th[data-c="${td.dataset.c}"]`).classList.add('hl'); td.classList.add('hl');
+    });
+  })();
+
+  // стартовое состояние: готовый пример
+  const first = EX[0]; $('cipher').value = first[1]; run(); enc();
+  const saved = LS.get('tab'); if (saved && tabs.indexOf(saved) >= 0) showTab(saved);
+})();
+</script>
+
+</body></html>
